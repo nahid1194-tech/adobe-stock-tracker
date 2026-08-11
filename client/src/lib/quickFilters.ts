@@ -47,7 +47,7 @@ export const QUICK_FILTER_DEFINITIONS: ReadonlyArray<QuickFilterDefinition> = [
   },
   {
     mode: 'downloads',
-    label: 'Downloads',
+    label: 'Most Downloaded',
     shortLabel: 'Downloads',
     description: 'Public assets ordered by download count, the metric Adobe actually exposes.',
     sortLabel: 'Most Downloaded',

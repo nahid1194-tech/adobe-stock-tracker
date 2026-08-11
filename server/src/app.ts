@@ -33,8 +33,19 @@ export function createApp(): express.Express {
   app.use('/api', settingsRouter);
 
   // Serve the built client in production (npm run build && npm start).
-  const clientDist = path.resolve(__dirname, '../../client/dist');
-  if (fs.existsSync(clientDist)) {
+  // The bundle lands at different relative paths depending on the runtime:
+  // locally the compiled app lives at server/dist (client/dist is two levels
+  // up), while a Vercel serverless bundle may place it one level deep or next
+  // to the entry. Probe several candidates so the SPA renders in every case.
+  const cwd = process.cwd();
+  const clientDistCandidates = [
+    path.resolve(__dirname, '../../client/dist'),
+    path.resolve(__dirname, '../client/dist'),
+    path.resolve(__dirname, 'client/dist'),
+    path.resolve(cwd, 'client/dist'),
+  ];
+  const clientDist = clientDistCandidates.find((candidate) => fs.existsSync(path.join(candidate, 'index.html')));
+  if (clientDist) {
     app.use(express.static(clientDist));
     app.get(/^(?!\/api).*/, (_req, res) => {
       res.sendFile(path.join(clientDist, 'index.html'));
