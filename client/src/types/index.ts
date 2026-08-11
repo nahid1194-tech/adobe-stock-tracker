@@ -10,9 +10,16 @@ export type ContentType =
 
 export type AssetStatus = 'downloaded' | 'undownloaded' | 'unknown';
 
-export type SortOption = 'downloads-desc' | 'downloads-asc' | 'creation-desc' | 'creation-asc';
+export type SortOption = 'relevance' | 'downloads-desc' | 'downloads-asc' | 'creation-desc' | 'creation-asc';
 
 export type FilterOption = 'all' | 'downloaded' | 'undiscovered' | 'recent' | 'transparent' | 'vector';
+
+/**
+ * Creator quick-filter modes. "featured" has no Adobe API mapping (the
+ * official Search API exposes no featured flag), so the UI shows an honest
+ * "not available" state for it instead of fabricating data.
+ */
+export type QuickFilter = 'all' | 'recent-approved' | 'featured' | 'downloads' | 'recently-observed';
 
 export type ContentTypeFilter = 'all' | Exclude<ContentType, 'unknown' | 'audio'>;
 
@@ -206,6 +213,7 @@ export interface CreatorAssetsResponse {
   sourceMessage?: string;
   notice?: string;
   provider?: string;
+  quickFilter?: QuickFilter;
 }
 
 export interface CreatorStats {
@@ -356,6 +364,7 @@ export interface AssetQuery {
   filter?: FilterOption;
   sort?: SortOption;
   contentType?: ContentTypeFilter;
+  quickFilter?: QuickFilter;
   page?: number;
   limit?: number;
 }

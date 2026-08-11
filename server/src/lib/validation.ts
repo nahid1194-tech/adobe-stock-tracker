@@ -4,11 +4,12 @@ import type {
   AssetSearchSort,
   ContentTypeFilter,
   FilterOption,
+  QuickFilter,
   SortOption,
 } from '../services/adobeStock/adobeStockTypes';
 
 const FILTERS: FilterOption[] = ['all', 'downloaded', 'undiscovered', 'recent', 'transparent', 'vector'];
-const SORTS: SortOption[] = ['downloads-desc', 'downloads-asc', 'creation-desc', 'creation-asc'];
+const SORTS: SortOption[] = ['relevance', 'downloads-desc', 'downloads-asc', 'creation-desc', 'creation-asc'];
 const CONTENT_TYPES: ContentTypeFilter[] = ['all', 'photo', 'illustration', 'vector', 'video', 'template', '3d'];
 const ASSET_FILTERS: AssetSearchFilter[] = [
   'all',
@@ -22,6 +23,7 @@ const ASSET_FILTERS: AssetSearchFilter[] = [
   'ai',
 ];
 const ASSET_SORTS: AssetSearchSort[] = ['relevance', 'downloads', 'newest', 'undiscovered'];
+const QUICK_FILTERS: QuickFilter[] = ['all', 'recent-approved', 'featured', 'downloads', 'recently-observed'];
 const HISTORY_RANGES = ['7d', '30d', '90d', 'all'] as const;
 
 const SEARCH_QUERY_MAX_LENGTH = 300;
@@ -111,6 +113,7 @@ export const validators = {
   contentType: (raw: string | undefined) => parseEnum(raw, CONTENT_TYPES, 'contentType', 'all'),
   assetFilter: (raw: string | undefined) => parseEnum(raw, ASSET_FILTERS, 'filter', 'all'),
   assetSort: (raw: string | undefined) => parseEnum(raw, ASSET_SORTS, 'sort', 'relevance'),
+  quickFilter: (raw: string | undefined) => parseEnum(raw, QUICK_FILTERS, 'quickFilter', 'all'),
   historyRange: (raw: string | undefined) => parseEnum(raw, HISTORY_RANGES, 'range', '30d'),
   page: (raw: string | undefined) => parsePositiveInt(raw, 'page', 1, 100000),
   limit: (raw: string | undefined) => parsePositiveInt(raw, 'limit', 100, 100),

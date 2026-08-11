@@ -19,9 +19,20 @@ export type ContentType =
 
 export type AssetStatus = 'downloaded' | 'undownloaded' | 'unknown';
 
-export type SortOption = 'downloads-desc' | 'downloads-asc' | 'creation-desc' | 'creation-asc';
+export type SortOption = 'relevance' | 'downloads-desc' | 'downloads-asc' | 'creation-desc' | 'creation-asc';
 
 export type FilterOption = 'all' | 'downloaded' | 'undiscovered' | 'recent' | 'transparent' | 'vector';
+
+/**
+ * Top-level quick filters for the creator dashboard.
+ *
+ * Each mode maps (via buildAdobeSearchParams) to a concrete Adobe Search API
+ * query. "featured" has NO mapping: the official Search API does not expose a
+ * featured flag/filter, so the UI shows an honest "not available" state
+ * instead of inventing one. "recently-observed" is a local-history sort
+ * (last_seen_at DESC), never a claim about Adobe approval dates.
+ */
+export type QuickFilter = 'all' | 'recent-approved' | 'featured' | 'downloads' | 'recently-observed';
 
 export type ContentTypeFilter = 'all' | Exclude<ContentType, 'unknown' | 'audio'>;
 
@@ -308,6 +319,8 @@ export interface CreatorAssetsResult {
   notice?: string;
   /** Machine-readable name of the provider that produced this result. */
   provider?: string;
+  /** Quick-filter mode this result was produced for (defaults to "all"). */
+  quickFilter?: QuickFilter;
 }
 
 export interface FetchCreatorAssetsParams {

@@ -2,6 +2,12 @@ import { Router } from 'express';
 
 import type { AdobeStockAsset } from '../services/adobeStock/adobeStockTypes';
 import { createDataProvider } from '../services/adobeStock';
+import {
+  buildAdobeSearchParams,
+  QUICK_FILTER_FEATURED_UNAVAILABLE_MESSAGE,
+  QUICK_FILTER_RECENT_APPROVED_NOTE,
+  QUICK_FILTER_RECENTLY_OBSERVED_NOTE,
+} from '../services/adobeStock/quickFilters';
 import { getHistoryProvider } from '../services/history/historicalDataProvider';
 import { recordAssetsObservation, trackCreator } from '../services/history/recorder';
 import { validators, validateCreatorId, validateAssetId } from '../lib/validation';
@@ -74,7 +80,7 @@ const creatorSearchCache = new TtlCache<Awaited<ReturnType<typeof provider.fetch
 const similarSearchCache = new TtlCache<Awaited<ReturnType<typeof provider.searchSimilar>>>(config.cache.ttlMs);
 
 /**
- * GET /api/adobe/search?creatorId=...&filter=&sort=&contentType=&page=&limit=
+ * GET /api/adobe/search?creatorId=...&quickFilter=&filter=&sort=&contentType=&page=&limit=
  *
  * Primary Creator ID search endpoint used by the frontend.
  *
@@ -83,6 +89,15 @@ const similarSearchCache = new TtlCache<Awaited<ReturnType<typeof provider.searc
  * parse JSON → normalize → return the standard CreatorAssetsResponse JSON to
  * the frontend. The API key never leaves this server.
  *
+ * `quickFilter` maps to an honest query via buildAdobeSearchParams():
+ *   - recent-approved  → order=creation   (Adobe exposes creation date only)
+ *   - downloads        → order=nb_downloads
+ *   - recently-observed→ all assets re-sorted by local last_seen_at DESC
+ *   - featured         → returns an honest "not available" empty result; the
+ *                        official API exposes no featured flag/filter.
+ * When `quickFilter` is "all" (or omitted), the explicit filter/sort/
+ * contentType query params drive the query as before.
+ *
  * Successful API results are also indexed locally (assets + creator) and
  * point-in-time observations are recorded (throttled) for the historical
  * analytics.
@@ -90,6 +105,7 @@ const similarSearchCache = new TtlCache<Awaited<ReturnType<typeof provider.searc
 router.get('/adobe/search', async (req, res, next) => {
   try {
     const creatorId = validateCreatorId(req.query.creatorId as string | undefined);
+    const quickFilter = validators.quickFilter(req.query.quickFilter as string | undefined);
     const filter = validators.filter(req.query.filter as string | undefined);
     const sort = validators.sort(req.query.sort as string | undefined);
     const contentType = validators.contentType(req.query.contentType as string | undefined);
@@ -98,17 +114,62 @@ router.get('/adobe/search', async (req, res, next) => {
 
     await history.recordSearch(creatorId, 'creator');
 
-    const cacheKey = JSON.stringify({ kind: 'creator', creatorId, filter, sort, contentType, page, limit });
+    if (quickFilter === 'featured') {
+      res.json({
+        creatorId,
+        assets: [],
+        total: null,
+        page,
+        pageSize: limit,
+        hasMore: false,
+        source: 'unavailable',
+        sourceMessage: QUICK_FILTER_FEATURED_UNAVAILABLE_MESSAGE,
+        provider: provider.name,
+        quickFilter,
+      });
+      return;
+    }
+
+    const preset = quickFilter !== 'all' ? buildAdobeSearchParams(quickFilter) : null;
+    const effectiveFilter = preset?.filter ?? filter;
+    const effectiveSort = preset?.sort ?? sort;
+    const effectiveContentType = preset?.contentType ?? contentType;
+
+    const cacheKey = JSON.stringify({
+      kind: 'creator',
+      creatorId,
+      quickFilter,
+      filter: effectiveFilter,
+      sort: effectiveSort,
+      contentType: effectiveContentType,
+      page,
+      limit,
+    });
     const cached = await creatorSearchCache.memoize(cacheKey, config.cache.ttlMs, () =>
-      provider.fetchCreatorAssets({ creatorId, filter, sort, contentType, page, limit }),
+      provider.fetchCreatorAssets({
+        creatorId,
+        filter: effectiveFilter,
+        sort: effectiveSort,
+        contentType: effectiveContentType,
+        page,
+        limit,
+      }),
     );
     // Clone so enrichment/tracking never mutates the cached entry.
-    const result = { ...cached, assets: [...cached.assets] };
+    const result = { ...cached, assets: [...cached.assets], quickFilter };
     if (result.source === 'ok' && result.assets.length > 0) {
       await trackCreator(history, creatorId, result.assets[0]?.creatorName);
       await history.trackAssets(result.assets);
       await recordAssetsObservation(history, provider, result.assets);
       result.assets = await history.enrichWithTracking(result.assets);
+    }
+    if (quickFilter === 'recently-observed') {
+      // Local-history sort: last_seen_at DESC (tracker-observed, not an Adobe
+      // approval date). Assets never seen locally sort to the end.
+      result.assets.sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''));
+      result.notice = [QUICK_FILTER_RECENTLY_OBSERVED_NOTE, result.notice].filter(Boolean).join(' ');
+    } else if (quickFilter === 'recent-approved') {
+      result.notice = [QUICK_FILTER_RECENT_APPROVED_NOTE, result.notice].filter(Boolean).join(' ');
     }
     res.json(result);
   } catch (error) {

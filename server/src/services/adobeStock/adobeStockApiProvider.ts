@@ -408,7 +408,7 @@ function mapFileToAsset(file: AdobeStockApiFile, creatorId: string): AdobeStockA
     vectorType: file.vector_type ?? null,
     isPremium: typeof file.is_premium === 'boolean' ? file.is_premium : null,
     downloads: null,
-    createdAt: null,
+    createdAt: parseCreationDate(file.creation_date),
     // The API only orders by "undiscovered"; it cannot tell us an asset is
     // undiscovered, and it never exposes download counts, so every asset
     // stays "unknown" unless a future provider exposes the real classification.
@@ -425,6 +425,21 @@ function mapFileToAsset(file: AdobeStockApiFile, creatorId: string): AdobeStockA
     firstSeenAt: null,
     lastSeenAt: null,
   };
+}
+
+/**
+ * Adobe returns `creation_date` as YYYY-MM-DD. Normalize to an ISO timestamp
+ * (UTC noon) so the client can display an honest "Creation date". Returns
+ * null when Adobe does not populate the field.
+ */
+function parseCreationDate(value: string | undefined): string | null {
+  if (typeof value !== 'string') return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!match) return null;
+  const [, year, month, day] = match;
+  const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day), 12, 0, 0));
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString();
 }
 
 /**

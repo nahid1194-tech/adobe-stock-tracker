@@ -40,6 +40,7 @@ export function buildAssetMetadataText(asset: Asset): string {
     `Keywords: ${asset.keywords && asset.keywords.length > 0 ? asset.keywords.join(', ') : 'unavailable'}`,
     `Description: ${asset.description ?? 'unavailable'}`,
     `Download count: not provided by Adobe Stock Search API`,
+    `Creation date: ${asset.createdAt ? new Date(asset.createdAt).toISOString().slice(0, 10) : 'not provided by Adobe Stock Search API'}`,
     `Upload date: not provided by official public Stock API`,
     `License history: requires an authorized Adobe account`,
   ];

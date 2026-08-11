@@ -56,6 +56,8 @@ export interface AdobeStockApiFile {
   keywords?: Array<{ name?: string }>;
   /** Asset production country, when the `country_name` column is requested. */
   country_name?: string;
+  /** Creation/publication date (YYYY-MM-DD), when the `creation_date` column is requested. */
+  creation_date?: string;
   /** Smaller preview tiers, when the corresponding result columns are requested. */
   thumbnail_110_url?: string;
   thumbnail_160_url?: string;
@@ -171,6 +173,7 @@ export function resolveApiOrder(filter: FilterOption, sort: SortOption): string 
     case 'downloaded':
       return 'nb_downloads';
     default:
+      if (sort === 'relevance') return 'relevance';
       return sort === 'creation-desc' || sort === 'creation-asc' ? 'creation' : 'nb_downloads';
   }
 }
@@ -245,6 +248,7 @@ const REQUESTED_COLUMNS = [
   'category',
   'category_hierarchy',
   'country_name',
+  'creation_date',
   'description',
   'is_transparent',
   'is_gentech',

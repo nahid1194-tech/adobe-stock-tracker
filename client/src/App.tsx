@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, ExternalLink, RotateCcw, ShieldCheck } from 'lucide-react';
 
 import { AssetCard } from '@/components/assets/AssetCard';
@@ -11,6 +11,7 @@ import { CreatorOverviewPanel } from '@/components/dashboard/CreatorOverviewPane
 import { CreatorSearch } from '@/components/dashboard/CreatorSearch';
 import { DashboardToolbar } from '@/components/dashboard/DashboardToolbar';
 import { HistoryPanel } from '@/components/dashboard/HistoryPanel';
+import { QuickFilterBar } from '@/components/dashboard/QuickFilterBar';
 import { SearchLinkButtons } from '@/components/dashboard/SearchLinkButtons';
 import { SearchModeTabs } from '@/components/dashboard/SearchModeTabs';
 import { SettingsPage } from '@/components/dashboard/SettingsPage';
@@ -33,7 +34,8 @@ import { useSummary } from '@/hooks/useSummary';
 import { Header, type AppPage } from '@/components/layout/Header';
 import { LicenseHistoryPage } from '@/components/dashboard/LicenseHistoryPage';
 import { formatCount } from '@/lib/utils';
-import type { SearchMode, SourceStatus } from '@/types';
+import { getQuickFilterDefinition, QUICK_FILTER_FEATURED_UNAVAILABLE_MESSAGE } from '@/lib/quickFilters';
+import type { QuickFilter, SearchMode, SourceStatus } from '@/types';
 
 const PROBLEM_SOURCES: SourceStatus[] = ['blocked', 'unavailable', 'rate_limited', 'timeout', 'error'];
 
@@ -41,9 +43,10 @@ export default function App() {
   const [searchMode, setSearchMode] = useState<SearchMode>('creator');
   const [page, setPage] = useState<AppPage>('dashboard');
   const [showSimilar, setShowSimilar] = useState(false);
+  const [quickFilter, setQuickFilter] = useState<QuickFilter>('all');
 
   const summary = useSummary();
-  const creator = useCreatorAssets();
+  const creator = useCreatorAssets(quickFilter);
   const asset = useAssetSearch();
   const assetId = useAssetIdSearch();
 
@@ -96,6 +99,20 @@ export default function App() {
   useEffect(() => {
     setShowSimilar(false);
   }, [assetIdValue, page, searchMode]);
+
+  // Every new Creator analysis starts from the default quick filter.
+  useEffect(() => {
+    setQuickFilter('all');
+  }, [creatorId]);
+
+  // "Recently Observed" re-orders the loaded assets by local last-seen time
+  // (tracker history). Every other mode renders Adobe's own order.
+  const displayedCreatorAssets = useMemo(() => {
+    if (quickFilter === 'recently-observed') {
+      return [...creatorAssets].sort((a, b) => (b.lastSeenAt ?? '').localeCompare(a.lastSeenAt ?? ''));
+    }
+    return creatorAssets;
+  }, [quickFilter, creatorAssets]);
 
   const isCreatorMode = searchMode === 'creator';
   const isAssetMode = searchMode === 'asset';
@@ -270,49 +287,64 @@ export default function App() {
 
                   <Separator />
 
-                  <DashboardToolbar
-                    filter={creator.filter}
-                    sort={creator.sort}
-                    contentType={creator.contentType}
-                    disabled={initialLoading}
-                    onFilterChange={creator.changeFilter}
-                    onSortChange={creator.changeSort}
-                    onContentTypeChange={creator.changeContentType}
-                  />
+                  <QuickFilterBar value={quickFilter} onChange={setQuickFilter} disabled={initialLoading} />
+                  <p className="text-xs text-muted-foreground">{getQuickFilterDefinition(quickFilter).description}</p>
 
-                  <section aria-label="Assets">
-                    {initialLoading && !creatorError && <SkeletonGrid />}
+                  {quickFilter === 'featured' ? (
+                    <section aria-label="Featured assets">
+                      <EmptyState title="Featured is not available" description={QUICK_FILTER_FEATURED_UNAVAILABLE_MESSAGE} />
+                    </section>
+                  ) : (
+                    <>
+                      <DashboardToolbar
+                        filter={creator.filter}
+                        sort={creator.sort}
+                        contentType={creator.contentType}
+                        disabled={initialLoading}
+                        onFilterChange={creator.changeFilter}
+                        onSortChange={creator.changeSort}
+                        onContentTypeChange={creator.changeContentType}
+                      />
 
-                    {!initialLoading && creatorError && <ErrorState error={creatorError} onRetry={creator.refresh} />}
+                      <section aria-label="Assets">
+                        {initialLoading && !creatorError && <SkeletonGrid />}
 
-                    {!initialLoading && !creatorError && creatorAssets.length > 0 && (
-                      <>
-                        <AssetGrid assets={creatorAssets} />
-                        <PaginationBar
-                          page={creator.page}
-                          total={creatorTotal}
-                          pageSize={100}
-                          loading={creatorPhase === 'loading' || creatorPhase === 'loading-more'}
-                          onPageChange={creator.goToPage}
-                        />
-                      </>
-                    )}
+                        {!initialLoading && creatorError && <ErrorState error={creatorError} onRetry={creator.refresh} />}
 
-                    {!initialLoading &&
-                      !creatorError &&
-                      creatorAssets.length === 0 &&
-                      (creatorSourceStatus === 'empty' ||
-                        (creatorSourceStatus && PROBLEM_SOURCES.includes(creatorSourceStatus))) && (
-                        <EmptyState
-                          title={creatorSourceStatus === 'empty' ? 'No public assets found.' : 'No data to display'}
-                          description={
-                            creatorSourceStatus === 'empty'
-                              ? 'Adobe did not return any publicly visible assets for this Creator ID. Try another Creator ID.'
-                              : 'The Adobe Stock API is unavailable, so no assets can be loaded. See the message above for details.'
-                          }
-                        />
-                      )}
-                  </section>
+                        {!initialLoading && !creatorError && displayedCreatorAssets.length > 0 && (
+                          <>
+                            <p className="mb-2 text-xs text-muted-foreground">
+                              {displayedCreatorAssets.length} asset{displayedCreatorAssets.length === 1 ? '' : 's'} loaded · Sorted by{' '}
+                              {getQuickFilterDefinition(quickFilter).sortLabel}
+                            </p>
+                            <AssetGrid assets={displayedCreatorAssets} />
+                            <PaginationBar
+                              page={creator.page}
+                              total={creatorTotal}
+                              pageSize={100}
+                              loading={creatorPhase === 'loading' || creatorPhase === 'loading-more'}
+                              onPageChange={creator.goToPage}
+                            />
+                          </>
+                        )}
+
+                        {!initialLoading &&
+                          !creatorError &&
+                          displayedCreatorAssets.length === 0 &&
+                          (creatorSourceStatus === 'empty' ||
+                            (creatorSourceStatus && PROBLEM_SOURCES.includes(creatorSourceStatus))) && (
+                            <EmptyState
+                              title={creatorSourceStatus === 'empty' ? 'No public assets found.' : 'No data to display'}
+                              description={
+                                creatorSourceStatus === 'empty'
+                                  ? 'Adobe did not return any publicly visible assets for this Creator ID. Try another Creator ID.'
+                                  : 'The Adobe Stock API is unavailable, so no assets can be loaded. See the message above for details.'
+                              }
+                            />
+                          )}
+                      </section>
+                    </>
+                  )}
                 </>
               )}
             </div>

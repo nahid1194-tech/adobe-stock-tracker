@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { fetchCreatorAssets, fetchCreatorSearchLinks, fetchCreatorStats } from '@/lib/api';
+import { buildQuickFilterPreset } from '@/lib/quickFilters';
 import type {
   ApiError,
   Asset,
@@ -9,6 +10,7 @@ import type {
   CreatorStats,
   FilterOption,
   ProviderMode,
+  QuickFilter,
   SortOption,
   SourceStatus,
 } from '@/types';
@@ -17,13 +19,19 @@ type Phase = 'idle' | 'analyzing' | 'loading' | 'loading-more' | 'loaded';
 
 const PAGE_SIZE = 100;
 
-export function useCreatorAssets() {
+/**
+ * Creator dashboard state. `quickFilter` drives the preset query for the
+ * quick-filter menu. "featured" is deliberately NOT fetched: the official
+ * Adobe API exposes no featured flag, so the caller renders an honest
+ * "not available" state instead.
+ */
+export function useCreatorAssets(quickFilter: QuickFilter = 'all') {
   const [input, setInput] = useState('');
   const [inputError, setInputError] = useState<string | null>(null);
   const [creatorId, setCreatorId] = useState<string | null>(null);
 
   const [filter, setFilter] = useState<FilterOption>('all');
-  const [sort, setSort] = useState<SortOption>('downloads-desc');
+  const [sort, setSort] = useState<SortOption>('relevance');
   const [contentType, setContentType] = useState<ContentTypeFilter>('all');
 
   const [mode, setMode] = useState<ProviderMode | null>(null);
@@ -76,7 +84,7 @@ export function useCreatorAssets() {
     setError(null);
     setPhase('idle');
     setFilter('all');
-    setSort('downloads-desc');
+    setSort('relevance');
     setContentType('all');
     setInput('');
     setInputError(null);
@@ -120,10 +128,34 @@ export function useCreatorAssets() {
     return () => controller.abort();
   }, [creatorId, refreshNonce]);
 
+  // Apply the quick-filter preset to the toolbar query controls. Switching to
+  // "all" restores the default relevance query; unsupported modes ("featured")
+  // never touch the query so no Adobe call is made for them.
+  useEffect(() => {
+    if (quickFilter === 'featured') return;
+    const preset = buildQuickFilterPreset(quickFilter);
+    setFilter(preset.filter);
+    setSort(preset.sort);
+    setContentType(preset.contentType);
+  }, [quickFilter]);
+
   // In "api" mode: fetch page 1 + stats whenever the query changes.
   useEffect(() => {
     if (!creatorId) return;
     if (mode !== 'api') return;
+    if (quickFilter === 'featured') {
+      // No Adobe query exists for "featured" — the caller shows an honest
+      // "not available" state. Never fabricate a request.
+      setAssets([]);
+      setTotal(null);
+      setHasMore(false);
+      setPage(0);
+      setSourceStatus(null);
+      setSourceMessage(null);
+      setNotice(null);
+      setPhase('loaded');
+      return;
+    }
     const controller = new AbortController();
     activeController.current = controller;
     setPhase('loading');
@@ -155,7 +187,7 @@ export function useCreatorAssets() {
     });
 
     return () => controller.abort();
-  }, [creatorId, mode, filter, sort, contentType, refreshNonce]);
+  }, [creatorId, mode, quickFilter, filter, sort, contentType, refreshNonce]);
 
   const refresh = useCallback(() => setRefreshNonce((n) => n + 1), []);
 

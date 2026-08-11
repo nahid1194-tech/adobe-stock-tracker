@@ -68,6 +68,7 @@ export function fetchCreatorAssets(creatorId: string, query: AssetQuery, signal?
   if (query.filter) params.set('filter', query.filter);
   if (query.sort) params.set('sort', query.sort);
   if (query.contentType) params.set('contentType', query.contentType);
+  if (query.quickFilter) params.set('quickFilter', query.quickFilter);
   if (query.page) params.set('page', String(query.page));
   if (query.limit) params.set('limit', String(query.limit));
   const qs = params.toString();

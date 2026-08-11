@@ -240,10 +240,22 @@ export function AssetCard({ asset, onFindSimilar }: AssetCardProps) {
               <dd className="shrink-0 text-right tabular-nums">{formatCount(asset.observationCount)}</dd>
             </div>
           )}
+          {asset.createdAt && (
+            <div className="flex items-baseline justify-between gap-2">
+              <dt className="shrink-0">Creation date</dt>
+              <dd className="shrink-0 text-right">{formatDate(asset.createdAt)}</dd>
+            </div>
+          )}
           {asset.firstSeenAt && (
             <div className="flex items-baseline justify-between gap-2">
               <dt className="shrink-0">First seen</dt>
               <dd className="shrink-0 text-right">{formatDate(asset.firstSeenAt)}</dd>
+            </div>
+          )}
+          {asset.lastSeenAt && (
+            <div className="flex items-baseline justify-between gap-2">
+              <dt className="shrink-0">Last seen</dt>
+              <dd className="shrink-0 text-right">{formatDate(asset.lastSeenAt)}</dd>
             </div>
           )}
         </dl>

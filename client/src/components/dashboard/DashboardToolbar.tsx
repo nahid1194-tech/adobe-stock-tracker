@@ -24,6 +24,7 @@ const FILTER_TABS: Array<{ value: FilterOption; label: string }> = [
 ];
 
 const SORT_OPTIONS: Array<{ value: SortOption; label: string }> = [
+  { value: 'relevance', label: 'Relevance' },
   { value: 'downloads-desc', label: 'Downloads: High to Low' },
   { value: 'downloads-asc', label: 'Downloads: Low to High' },
   { value: 'creation-desc', label: 'Newest' },
