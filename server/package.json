@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "tsx watch src/index.ts",
+    "prebuild": "npm run db:generate",
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
